@@ -1,7 +1,7 @@
 # NOTES FOR FINISHING THE DOCUMENTS: Find out what we do about NPM as well as logical time!!!
 
 # Documentation for GameStateLogger
-GameStateLogger is a library that allows users to log events in their JavaScript games, to enable analyzing, debugging, and in limited capacity, observe a run of a game to ensure that it is not fraudulent or to observe where bugs in the gameplay might have arisen.
+GameStateLogger is a library that allows users to log events in their JavaScript games, to enable analyzing, debugging, and in limited capacity, replay a run of a game to ensure that it is not fraudulent or to observe where bugs in the gameplay might have arisen.
 
 GameStateLogger is a lightweight framework that lets the user determine how many and which events to log without causing a large performance overhead.  
 
@@ -12,18 +12,24 @@ GameStateLogger is a lightweight framework that lets the user determine how ma
   
 [Initializing the GameStateLogger](#initializingthegamestatelogger)  
 [Available functions](#available-functions)  
-- [logKeyDownEvent(ID, event, time = "n/a", points = "n/a")](#logkeydowneventid-event-time--na-points--na)
-- [logKeyUpEvent(ID, event, time = "n/a", points = "n/a")](#logkeyupeventid-event-time--na-points--na)
-- [logClickEvent(ID, event, location, time = "n/a", points = "n/a")](#logclickeventid-event-location-time--na-points--na)  
-- [logNewLevel(ID, newLevel, time = "n/a", points = "n/a")](#lognewlevelidnewlevel-time--na-points--na)  
-- [logGameResult(ID, event, time = "n/a", points = "n/a", highscore = "n/a")](#loggameresultid-event-time--na-points--na-highscore--na)
-- [logWindowClose(ID, event, time = "n/a", points = "n/a", highscore = "n/a")](#logwindowcloseid-event-time--na-points--na-highscore--na)  
+- [logKeyDownEvent(key, time, points = "n/a")](#logkeydowneventkey-time-points--na)
+- [logKeyUpEvent(key, time, points = "n/a")](#logkeyupeventkey-time-points--na)
+- [logClickEvent(event, location, time, points = "n/a")](#logclickeventevent-location-time-points--na)  
+- [logNewLevel(event, time, points = "n/a")](#lognewlevelevent-time-points--na)  
+- [logLocation(event, location, time)](#loglocationevent-location-time)  
+- [logRandomSeed(event, randomSeed, time)](#lograndomseedevent-randomseed-time)  
+- [logGameResult(event, time, points = "n/a")](#loggameresultevent-time-points--na)
+- [logWindowClose(event, time, points = "n/a")](#logwindowcloseevent-time-points--na)  
   
 ## Importing GameStateLogger to your game
 
 ### Requirements to use the API 
-Every logging function requires the framework user to log a game ID.
-This requirement is to enable precise analysis in databases, as the user of the framework will then be able to use the ID to group events together.
+Every logging function requires the framework user to log a "time".
+This requirement is to enable precise analysis of when logged events have happened in relation to each other.
+It is also a crucial requirement for allowing to utilize replay scripts of the logged data.
+It is recommended to implement a logical time system in the game, and re-use this logical time system in any replay script. [Read more about logical time here.](https://www.geeksforgeeks.org/distributed-systems/logical-clock-in-distributed-system/)
+Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging.
+The recommended approach is a tick or timestep based system, wherein each operation in your game that alters game state increments the total timestep by one.
 
 > [!NOTE]  
 > JavaScript requires that any file that uses a module is also a module itself.
@@ -44,109 +50,133 @@ This requirement is to enable precise analysis in databases, as the user of the 
 >```
 
 ### Importing
-In order to use the framework, you need to import the npm package for GameStateLogger.
-
-In your terminal of choice, from the folder in which you main JavaScript file for your game is placed, run:
-```
-npm install GameStateLogger
-```
+In order to use the framework, you need to import the source code for GameStateLogger in your directory.
 
 Then, in the top of your game JavaScript file, import the GameStateLogger using ES Module syntax:
 ```
-import { GameStateLogger } from 'gamestatelogger';
+import { GameStateLogger } from 'your/path/to/gamestatelogger.js';
 ```
   
 
 ## Initializing the GameStateLogger 
-To create an instance of the GameStateLogger for use in your game file, create a new object of the GameStateLogger:
-`var gameStateLogger = new GameStateLogger(eventLog, flushSize)`
+To create an instance of the GameStateLogger for use in your game file, create a new object of the GameStateLogger with auto-generated ID:
+`var gameStateLogger = new GameStateLogger(flushSize)`
 
->**eventLog \[Type: Array\]:** An array for holding logged events.  
->**flushSize \[Type: Number\]:** A Number that lets the user define how often the eventLog should be sent to the server.  
+
+To create an instance of the GameStateLogger for use in your game file, create a new object of the GameStateLogger with self-defined ID:
+`var gameStateLogger = new GameStateLogger(flushSize, YOUR_ID)`
+
+>**flushSize \[Type: Number\]:** A Number that lets the user define how often the eventLog should be sent to the server and flushed.
+
+> [!NOTE]
+> GameStateLogger has an in-built function for [auto generating near random IDs](https://stackoverflow.com/questions/3231459/how-can-i-create-unique-ids-with-javascript). The function utilizes UNIX time and a random Number to generated a random ID string:
+> `Date.now().toString(36) + Math.random().toString(36))`  
+> If no ID argument is given when instantiating the GameStateLogger, such a random ID will be generated.
 
 ## Available functions
-### logKeyDownEvent(ID, event, time = "n/a", points = "n/a")
+### logKeyDownEvent(key, time, points = "n/a")
 
->**ID \[Type: Number\]:** game ID.  
->**event \[Type: String\]:** A string with the name of the key pressed. Example: "ArrowDown" or "w".  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>**key \[Type: String or Number\]:** A String with the name of the key pressed or a Number of the ASCII key corresponding to the key pressed. Example: "ArrowDown", "w" or 37.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
 
-`logKeyDownEvent(...)` is used to log when a user presses a key. Note that the logged event automatically comes with a field `keyPressType: "keyDown"`, to distinguish it from a keyUp event.
+`logKeyDownEvent(...)` is used to log when a user presses a key. Note that the logged event automatically comes with a field `ID: your_id_or_random_id` as well as `eventName: "keyDown"`.  
 
-You have to have some form of game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"keyDown", "keyPressed":40, "eventTime":171, "points":4}`
 
-`time` and `points` default to a value of “n/a” if no parameter is given. 
 
-### logKeyUpEvent(ID, event, time = "n/a", points = "n/a")
+### logKeyUpEvent(key, time, points = "n/a")
 
->**ID \[Type: Number\]:** game ID.  
->**event \[Type: String\]:** A string with the name of the key released. Example: "ArrowDown" or "w".  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>**key \[Type: String or Number\]:** A String with the name of the key pressed or a Number of the ASCII key corresponding to the key pressed. Example: "ArrowDown", "w" or 37.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
 
-`logKeyUpEvent(...)` is used to log when a user releases a key. Note that the logged event automatically comes with a field `keyPressType: "keyUp"`, to distinguish it from a keyDown event.
+`logKeyUpEvent(...)` is used to log when a user releases a key. Note that the logged event automatically comes with a field `ID: your_id_or_random_id` as well as `eventName: "keyUp"`.  
 
-You have to have some form of Game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"keyUp", "keyPressed":40, "eventTime":171, "points":4}`   
 
-`time` and `points` default to a value of “n/a” if no parameter is given. 
 
-### logClickEvent(ID, event, location, time = "n/a", points = "n/a")
+### logClickEvent(event, location, time, points = "n/a")
 
->**ID \[Type: Number\]:** game ID.  
->**event \[Type: String\]:** A string with the name of the key pressed. Example: "ArrowDown" or "w".  
+>**event \[Type: String\]:** A string with a description of the event, such as "Click" or "Button click".  
 >**location \[Type: Object || String || Number\]:** The location of the click. Recommended formats:  
 >Object of the form: {x : xcoord, y: ycoord}.  
->A string containing the ID of an HTML element that was clicked.  
->A string or number identifier of a clickable element in your game.  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>A String containing the ID of an HTML element that was clicked.  
+>A String or Number identifier of a clickable element in your game.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
 
 `logClickEvent(...)` is used to log when a user clicks with their mouse.
 
-You have to have some form of game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"Click", "location":"game-start", "eventTime":3, "points":0}`   
 
-`time` and `points` default to a value of “n/a” if no parameter is given. 
 
-### logNewLevel(ID, newLevel, time = "n/a", points = "n/a") 
+### logNewLevel(event, time, points = "n/a") 
 
->**ID \[Type: Number\]:** game ID.  
->**newLevel \[Type: Number\]:** A number representing the new level.  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>**event \[Type: String or Number\]:** A String or Number representing the change in level, such as 2 or "New level: 2".  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
 
 `logNewLevel(...)` is used to logging when a user changes levels, if your game has a level system. 
 This lets you keep track of at which level following logged events happened.
 
-You have to have some form of game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"Level increased to 2", levelChanged:true, "eventTime":320, "points":5}`
 
-`time` and `points` default to a value of “n/a” if no parameter is given. 
 
-### logGameResult(ID, event, time = "n/a", points = "n/a", highscore = "n/a")
+### logLocation(event, location, time)
 
->**ID \[Type: Number\]:** game ID.  
+>**event \[Type: String\]:** A descriptor of the element of which you are logging a location. I.e.: "Position of Snake's head".  
+>**location \[Object, String or Number\]:** An Object, String or Number that describes a location. If using Object, notation could i.e. be: {x: ..., y: ...}.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
+
+`logLocation(...)` is used to log the location of any game elements the user wishes, at the point of time in game they wish.    
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"Position of Snake's head", location:{x:160, y:140}, "eventTime":320}`
+
+
+### logRandomSeed(event, randomSeed, time)
+
+>**event \[Type: String\]:** A descriptor of the element for which you are logging a random seed, i.e. "Apple x-value".   
+>**randomSeed \[Number\]:** The random seed generated.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
+
+`logRandomSeed(...)` is used to log any random seeds that may be present in the game, when they are generated.    
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"Apple x-value", randomSeed:85, "eventTime":320}`
+
+
+### logGameResult(event, time, points = "n/a")
+
 >**event \[Type: String\]:** A string representing the game result. Examples: "Game Over", "Tie", "Player won". The specific content of the string is up to user of the framework, however we recommend to keep it consistent across all logs.  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
 
 `logGameResult(...)` is used to log intermediate game results, such as game overs, ties, or wins of a specific round.
 
-Note that a separate function exists for logging when a user closes their window, [[#logWindowClose(ID, event, time = "n/a", points = "n/a", highscore = "n/a")]]
+Note that a separate function exists for logging when a user closes their window, [logWindowClose(event, time, points = "n/a")](#logwindowcloseevent-time-points--na)  
 
-You have to have some form of game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "gameEnd":true, "eventName":"Game over!", "eventTime":890, "points":7}`
 
-`time` and `points` default to a value of “n/a” if no parameter is given. 
 
-### logWindowClose(ID, event, time = "n/a", points = "n/a", highscore = "n/a")
+### logWindowClose(event, time, points = "n/a")
 
->**ID \[Type: Number\]:** game ID.  
 >**event \[Type: String\]:** A string representing that the window has been close. Examples: "Window closed". The specific content of the string is up to user of the framework, however we recommend to keep it consistent across all logs.  
->_OPTIONAL:_ **time \[Type: Number\]:** The time at which an event has occurred. Choosing a logical time or real time is up to the user of the framework, however logical time is encouraged for precise logging. Consistency in time counting should be kept across all logs.  
+>**time \[Type: Number\]:** The time at which an event has occurred. Consistency in time counting should be kept across all logs.  
 >_OPTIONAL:_ **points \[Type: Number\]:** A number representing the current number of points the player has.  
->_OPTIONAL:_ **highscore \[Type: Number\]:** A number representing the final highscore of the player.  
 
 `logWindowClose(...)` is used to log that the window has been closed. This function is intended to be used when a game session is completely ended.
-A separate function exists for logging events such as Game Overs, see [logGameResult(ID, event, time = "n/a", points = "n/a", highscore = "n/a")](#loggameresultid-event-time--na-points--na-highscore--na).  
+A separate function exists for logging events such as Game Overs, see [logGameResult(event, time, points = "n/a")](#loggameresultevent-time-points--na).  
 
-You have to have some form of game ID implemented in your game, that you can send through the log. See [Requirements to use the API](#requirementstousethe-api).  
-`time` and `points` default to a value of “n/a” if no parameter is given. 
+`points` default to a value of “n/a” if no parameter is given.   
+  
+Example logging: `{"ID":"your_id_or_random_id", "eventName":"Window closed", "eventTime":890, "points":7}`
