@@ -1,5 +1,3 @@
-# NOTES FOR FINISHING THE DOCUMENTS: Find out what we do about NPM as well as logical time!!!
-
 # Documentation for GameStateLogger
 GameStateLogger is a library that allows users to log events in their JavaScript games, to enable analyzing, debugging, and in limited capacity, replay a run of a game to ensure that it is not fraudulent or to observe where bugs in the gameplay might have arisen.
 
